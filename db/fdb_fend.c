@@ -721,6 +721,15 @@ retry_find_table:
 
         /* add ourselves back */
         __fdb_add_user(fdb);
+
+        
+        /* it is possible for the table to be added; check again */
+        if( _table_exists(fdb, table_name, version))
+        {
+            /* fdb unlocked, users incremented */
+            rc = FDB_NOERR;
+            goto done;
+        }
     }
 
     /* is this the first table? grab sqlite_stats too */
