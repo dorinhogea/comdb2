@@ -13,15 +13,17 @@ cdb2cfg2=$4
 
 output=run.out
 
+mach=`cdb2sql --tabs ${CDB2_OPTIONS} $db1 default "SELECT comdb2_host()"`
+
 # populate table on remote
 cdb2sql -s --cdb2cfg $cdb2cfg1 $db1 default - < remdata.req > $output 2>&1
 
-cdb2sql -s --cdb2cfg $cdb2cfg2 $db2 default "select * from LOCAL_${db1}.t order by id" >> $output 2>&1
+cdb2sql -s --host $mach --cdb2cfg $cdb2cfg2 $db2 "select * from LOCAL_${db1}.t order by id" >> $output 2>&1
 
 # get the version V2
 #comdb2sc $a_dbname send fdb info db >> $output 2>&1
 echo cdb2sql --tabs --cdb2cfg $cdb2cfg2 $db2 default "exec procedure sys.cmd.send(\"fdb info db\")" 
-cdb2sql --tabs --cdb2cfg $cdb2cfg2 $db2 default "exec procedure sys.cmd.send(\"fdb info db\")" >> $output 2>&1
+cdb2sql --tabs --host $mach --cdb2cfg $cdb2cfg2 $db2 default "exec procedure sys.cmd.send(\"fdb info db\")" >> $output 2>&1
 
 # validate results 
 testcase_output=$(cat $output)
