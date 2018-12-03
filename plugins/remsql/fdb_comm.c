@@ -857,6 +857,13 @@ static void fdb_msg_prepare_message(fdb_msg_t *msg)
     }
 }
 
+/* internal limits for variable fields in incoming packets; less conservative than internal comdb2
+ limits, with the intent to protect against corrupted length fields */
+#define _MAX_ERRSTRLEN 1024
+#define _MAX_SRCNAMELEN 256
+#define _MAX_ROWLEN 512000000
+#define _MAX_IXLEN (2*MAXKEYLEN)
+
 /* stuff comes in network endian fomat */
 int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
 {
@@ -940,11 +947,17 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         if (rc != sizeof(msg->rc.errstrlen))
             return -1;
         msg->rc.errstrlen = ntohl(msg->rc.errstrlen);
+        if (msg->rc.errstrlen > _MAX_ERRSTRLEN) {
+            logmsg(LOGMSG_ERROR, "%s: error string too long %d\n", __func__, msg->rc.errstrlen);
+            return -1;
+        }
 
         if (msg->rc.errstrlen) {
             msg->rc.errstr = (char *)malloc(msg->rc.errstrlen);
-            if (!msg->rc.errstr)
+            if (!msg->rc.errstr) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__, msg->rc.errstrlen);
                 return -1;
+            }
 
             rc = sbuf2fread(msg->rc.errstr, 1, msg->rc.errstrlen, sb);
             if (rc != msg->rc.errstrlen)
@@ -997,11 +1010,17 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         if (rc != sizeof(msg->co.srcnamelen))
             return -1;
         msg->co.srcnamelen = ntohl(msg->co.srcnamelen);
+        if (msg->co.srcnamelen > _MAX_SRCNAMELEN) {
+            logmsg(LOGMSG_ERROR, "%s: srcname string too long %dd\n", __func__, msg->co.srcnamelen);
+            return -1;
+        }
 
         if (msg->co.srcnamelen > 0) {
             msg->co.srcname = (char *)malloc(msg->co.srcnamelen);
-            if (!msg->co.srcname)
+            if (!msg->co.srcname) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__, msg->co.srcnamelen);
                 return -1;
+            }
 
             rc = sbuf2fread(msg->co.srcname, 1, msg->co.srcnamelen, sb);
             if (rc != msg->co.srcnamelen)
@@ -1101,10 +1120,18 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         msg->dr.datacopylen = 0;
 
         if (msg->dr.datalen > 0 || msg->dr.datacopylen > 0) {
+            if (msg->dr.datalen+msg->dr.datacopylen > _MAX_ROWLEN) {
+                logmsg(LOGMSG_ERROR, "%s: data row too long %d\n", __func__,
+                        msg->dr.datalen+msg->dr.datacopylen);
+                return -1;
+            }
             msg->dr.data =
                 (char *)malloc(msg->dr.datalen + msg->dr.datacopylen);
-            if (!msg->dr.data)
+            if (!msg->dr.data) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        msg->dr.datalen+msg->dr.datacopylen);
                 return -1;
+            }    
             msg->dr.datacopy = msg->dr.data + msg->dr.datalen;
             /*
             printf("Received in %p\n", msg->dr.data);
@@ -1145,10 +1172,16 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         msg->cf.keylen = ntohl(msg->cf.keylen);
 
         assert(msg->cf.keylen > 0);
+        if(msg->cf.keylen > MAXKEYLEN) {
+            logmsg(LOGMSG_ERROR, "%s: keylen too long %dd\n", __func__, msg->cf.keylen);
+            return -1;
+        }
 
         msg->cf.key = (char *)malloc(msg->cf.keylen);
-        if (!msg->cf.key)
+        if (!msg->cf.key) {
+            logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__, msg->cf.keylen);
             return -1;
+        }
 
         rc = sbuf2fread(msg->cf.key, 1, msg->cf.keylen, sb);
         if (rc != msg->cf.keylen)
@@ -1158,79 +1191,65 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
 
     case FDB_MSG_RUN_SQL:
 
-        /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
-
         rc = sbuf2fread((char *)msg->sq.cid, 1, idsz, sb);
         if (rc != idsz)
             return -1;
-        /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
 
-        /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
         rc = sbuf2fread((char *)&msg->sq.version, 1, sizeof(msg->sq.version),
                         sb);
         if (rc != sizeof(msg->sq.version))
             return -1;
         msg->sq.version = ntohl(msg->sq.version);
-        /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
 
-        /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
         rc = sbuf2fread((char *)&msg->sq.flags, 1, sizeof(msg->sq.flags), sb);
         if (rc != sizeof(msg->sq.flags))
             return -1;
         msg->sq.flags = ntohl(msg->sq.flags);
-        /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
 
-        /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
         rc = sbuf2fread((char *)&msg->sq.sqllen, 1, sizeof(msg->sq.sqllen), sb);
         if (rc != sizeof(msg->sq.sqllen))
             return -1;
         msg->sq.sqllen = ntohl(msg->sq.sqllen);
-        /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
+        if (msg->sq.sqllen > _MAX_ROWLEN) {
+            logmsg(LOGMSG_ERROR, "%s: sql query too long %d\n", __func__,
+                    msg->sq.sqllen);
+            return -1;
+        }
 
         msg->sq.sql = (char *)malloc(msg->sq.sqllen);
-        if (!msg->sq.sql)
+        if (!msg->sq.sql) {
+            logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                    msg->sq.sqllen);
             return -1;
+        }
 
-        /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
         rc = sbuf2fread(msg->sq.sql, 1, msg->sq.sqllen, sb);
         if (rc != msg->sq.sqllen)
             return -1;
-        /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n", __LINE__,
-         * osql_log_time());*/
 
         /* if we have end trimming, pass that */
         if (msg->sq.flags == FDB_RUN_SQL_TRIM) {
-            /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-             * osql_log_time());*/
             rc = sbuf2fread((char *)&msg->sq.keylen, 1, sizeof(msg->sq.keylen),
                             sb);
             if (rc != sizeof(msg->sq.keylen))
                 return -1;
             msg->sq.keylen = ntohl(msg->sq.keylen);
-            /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n",
-             * __LINE__, osql_log_time());*/
+            if(msg->sq.keylen > MAXKEYLEN) {
+                logmsg(LOGMSG_ERROR, "%s: keylen too long %dd\n", __func__, msg->sq.keylen);
+                return -1;
+            }
 
             if (msg->sq.keylen > 0) {
                 msg->sq.key = (char *)malloc(msg->sq.keylen);
-                if (!msg->sq.key)
+                if (!msg->sq.key) {
+                    logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                            msg->sq.keylen);
                     return -1;
+                }
 
-                /*fprintf(stderr, "%d XYXY calling sbuf2fread %llu\n", __LINE__,
-                 * osql_log_time());*/
                 rc = sbuf2fread(msg->sq.key, 1, msg->sq.keylen, sb);
                 if (rc != msg->sq.keylen)
                     return -1;
-                /*fprintf(stderr, "%d XYXY DONE calling sbuf2fread %llu\n",
-                 * __LINE__, osql_log_time());*/
             }
 
         } else {
@@ -1280,6 +1299,11 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         if (rc != sizeof(msg->in.datalen))
             return -1;
         msg->in.datalen = ntohl(msg->in.datalen);
+        if (msg->in.datalen > _MAX_ROWLEN) {
+            logmsg(LOGMSG_ERROR, "%s: insert row too long %d\n", __func__,
+                    msg->in.datalen);
+            return -1;
+        }
 
         rc = sbuf2fread((char *)&msg->in.seq, 1, sizeof(msg->in.seq), sb);
         if (rc != sizeof(msg->in.seq))
@@ -1288,8 +1312,11 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
 
         if (msg->in.datalen > 0) {
             msg->in.data = (char *)malloc(msg->in.datalen);
-            if (!msg->in.data)
+            if (!msg->in.data) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        msg->in.datalen);
                 return -1;
+            }
 
             rc = sbuf2fread(msg->in.data, 1, msg->in.datalen, sb);
             if (rc != msg->in.datalen)
@@ -1303,9 +1330,17 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
             if (rc != sizeof(tmp))
                 return -1;
             tmp = ntohl(tmp);
+            if (tmp > _MAX_SRCNAMELEN) {
+                logmsg(LOGMSG_ERROR, "%s: table name long %d\n", __func__,
+                        tmp);
+                return -1;            
+            }
             msg->in.tblname = malloc(tmp);
-            if (!msg->in.tblname)
+            if (!msg->in.tblname) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        tmp);
                 return -1;
+            }
             rc = sbuf2fread(msg->in.tblname, 1, tmp, sb);
             if (rc != tmp)
                 return -1;
@@ -1359,9 +1394,17 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
             if (rc != sizeof(tmp))
                 return -1;
             tmp = ntohl(tmp);
+            if (tmp > _MAX_SRCNAMELEN) {
+                logmsg(LOGMSG_ERROR, "%s: table name long %d\n", __func__,
+                        tmp);
+                return -1;            
+            }
             msg->de.tblname = malloc(tmp);
-            if (!msg->de.tblname)
+            if (!msg->de.tblname) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        tmp);
                 return -1;
+            }
             rc = sbuf2fread(msg->de.tblname, 1, tmp, sb);
             if (rc != tmp)
                 return -1;
@@ -1423,6 +1466,11 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         if (rc != sizeof(msg->up.datalen))
             return -1;
         msg->up.datalen = ntohl(msg->up.datalen);
+        if (msg->up.datalen > _MAX_ROWLEN) {
+            logmsg(LOGMSG_ERROR, "%s: update row too long %d\n", __func__,
+                    msg->up.datalen);
+            return -1;
+        }
 
         rc = sbuf2fread((char *)&msg->up.seq, 1, sizeof(msg->up.seq), sb);
         if (rc != sizeof(msg->up.seq))
@@ -1431,8 +1479,11 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
 
         if (msg->up.datalen > 0) {
             msg->up.data = (char *)malloc(msg->up.datalen);
-            if (!msg->up.data)
+            if (!msg->up.data) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        msg->up.datalen);
                 return -1;
+            }
 
             rc = sbuf2fread(msg->up.data, 1, msg->up.datalen, sb);
             if (rc != msg->up.datalen)
@@ -1446,9 +1497,17 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
             if (rc != sizeof(tmp))
                 return -1;
             tmp = ntohl(tmp);
+            if (tmp > _MAX_SRCNAMELEN) {
+                logmsg(LOGMSG_ERROR, "%s: table name long %d\n", __func__,
+                        tmp);
+                return -1;            
+            }
             msg->up.tblname = malloc(tmp);
-            if (!msg->up.tblname)
+            if (!msg->up.tblname) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        tmp);
                 return -1;
+            }
             rc = sbuf2fread(msg->up.tblname, 1, tmp, sb);
             if (rc != tmp)
                 return -1;
@@ -1493,6 +1552,11 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
         if (rc != sizeof(msg->ix.ixlen))
             return -1;
         msg->ix.ixlen = ntohl(msg->ix.ixlen);
+        if (msg->ix.ixlen > _MAX_IXLEN) {
+            logmsg(LOGMSG_ERROR, "%s: key len long %d\n", __func__,
+                    msg->ix.ixlen);
+            return -1;
+        }
 
         rc = sbuf2fread((char *)&msg->ix.seq, 1, sizeof(msg->ix.seq), sb);
         if (rc != sizeof(msg->ix.seq))
@@ -1501,8 +1565,11 @@ int fdb_msg_read_message(SBUF2 *sb, fdb_msg_t *msg, enum recv_flags flags)
 
         if (msg->ix.ixlen > 0) {
             msg->ix.ix = (char *)malloc(msg->ix.ixlen);
-            if (!msg->ix.ix)
+            if (!msg->ix.ix) {
+                logmsg(LOGMSG_ERROR, "%s: malloc failure length %d\n", __func__,
+                        msg->ix.ixlen);
                 return -1;
+            }
 
             rc = sbuf2fread(msg->ix.ix, 1, msg->ix.ixlen, sb);
             if (rc != msg->ix.ixlen)
@@ -2464,11 +2531,7 @@ static int fdb_msg_write_message(SBUF2 *sb, fdb_msg_t *msg, int flush)
         return FDB_ERR_UNSUPPORTED;
     }
 
-    unsigned long long t = osql_log_time();
     if (flush /*&& (msg->hd.type != FDB_MSG_RUN_SQL)*/) {
-        /*
-        fprintf(stderr, "Flushing %llu\n", t);
-        */
         rc = sbuf2flush(sb);
         if (rc <= 0) {
             /*
@@ -2478,8 +2541,6 @@ static int fdb_msg_write_message(SBUF2 *sb, fdb_msg_t *msg, int flush)
         }
     }
 
-    t = osql_log_time();
-    /*fprintf(stderr, "Done %s %llu\n", __func__, t);*/
     return 0;
 }
 
@@ -3542,9 +3603,9 @@ int handle_remtran_request(comdb2_appsock_arg_t *arg)
     }
 
     memcpy(&open_msg, &msg, sizeof open_msg);
-    open_msg.tid = open_msg.tiduuid;
+    open_msg.tid = (char*)open_msg.tiduuid;
     uuidstr_t us;
-    comdb2uuidstr(open_msg.tid, us);
+    comdb2uuidstr((unsigned char *)open_msg.tid, us);
 
     /* TODO: review the no-timeout transaction later on */
     if (gbl_notimeouts) {
