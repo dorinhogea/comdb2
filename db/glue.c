@@ -254,6 +254,7 @@ void init_fake_ireq(struct dbenv *dbenv, struct ireq *iq)
     iq->dbenv = dbenv;
     iq->is_fake = 1;
     iq->helper_thread = -1;
+    listc_init(&iq->scs_status, offsetof(struct schema_change_status, lnk));
 }
 
 void set_tran_verify_updateid(tran_type *tran)
