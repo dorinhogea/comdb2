@@ -1,0 +1,246 @@
+[
+ {
+  "NAME"      : "t",
+  "PERIOD"    : "daily",
+  "RETENTION" : 7,
+  "SHARD0NAME": "<none>",
+  "ROLLOUT"   : "TRUNCATE",
+  "TABLES"    :
+  [
+  {
+   "TABLENAME"    : "$0_F64CD191",
+  },
+  {
+   "TABLENAME"    : "$1_A2620AE4",
+  },
+  {
+   "TABLENAME"    : "$2_C429139B",
+  },
+  {
+   "TABLENAME"    : "$3_8A26EC5C",
+  },
+  {
+   "TABLENAME"    : "$4_3FDAE1EA",
+  },
+  {
+   "TABLENAME"    : "$5_9FEC23C1",
+  },
+  {
+   "TABLENAME"    : "$6_93A67B48",
+  }
+  ]
+ }
+]
+(name='t', period='daily', retention=7, nshards=7, version=1, shard0name='<none>')
+(name='t', shardname='$0_F64CD191')
+(name='t', shardname='$1_A2620AE4')
+(name='t', shardname='$2_C429139B')
+(name='t', shardname='$3_8A26EC5C')
+(name='t', shardname='$4_3FDAE1EA')
+(name='t', shardname='$5_9FEC23C1')
+(name='t', shardname='$6_93A67B48')
+(rows inserted=5)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=5)
+
+[]
+
+(count(*)=70)
+(a=6, b=NULL)
+(a=7, b=NULL)
+(a=8, b=NULL)
+(a=9, b=NULL)
+(a=10, b=NULL)
+(a=16, b=NULL)
+(a=17, b=NULL)
+(a=18, b=NULL)
+(a=19, b=NULL)
+(a=20, b=NULL)
+(a=26, b=NULL)
+(a=27, b=NULL)
+(a=28, b=NULL)
+(a=29, b=NULL)
+(a=30, b=NULL)
+(a=31, b=NULL)
+(a=32, b=NULL)
+(a=33, b=NULL)
+(a=34, b=NULL)
+(a=35, b=NULL)
+(a=36, b=NULL)
+(a=37, b=NULL)
+(a=38, b=NULL)
+(a=39, b=NULL)
+(a=40, b=NULL)
+(a=46, b=NULL)
+(a=47, b=NULL)
+(a=48, b=NULL)
+(a=49, b=NULL)
+(a=50, b=NULL)
+(a=51, b=NULL)
+(a=52, b=NULL)
+(a=53, b=NULL)
+(a=54, b=NULL)
+(a=55, b=NULL)
+(a=56, b=NULL)
+(a=57, b=NULL)
+(a=58, b=NULL)
+(a=59, b=NULL)
+(a=60, b=NULL)
+(a=61, b=NULL)
+(a=62, b=NULL)
+(a=63, b=NULL)
+(a=64, b=NULL)
+(a=65, b=NULL)
+(a=66, b=NULL)
+(a=67, b=NULL)
+(a=68, b=NULL)
+(a=69, b=NULL)
+(a=70, b=NULL)
+(a=1021, b=NULL)
+(a=1022, b=NULL)
+(a=1023, b=NULL)
+(a=1024, b=NULL)
+(a=1025, b=NULL)
+(a=1041, b=NULL)
+(a=1042, b=NULL)
+(a=1043, b=NULL)
+(a=1044, b=NULL)
+(a=1045, b=NULL)
+(a=2001, b=NULL)
+(a=2002, b=NULL)
+(a=2003, b=NULL)
+(a=2004, b=NULL)
+(a=2005, b=NULL)
+(a=2006, b=NULL)
+(a=2007, b=NULL)
+(a=2008, b=NULL)
+(a=2009, b=NULL)
+(a=2010, b=NULL)
+[
+ {
+  "NAME"      : "tt",
+  "PERIOD"    : "daily",
+  "RETENTION" : 7,
+  "SHARD0NAME": "<none>",
+  "ROLLOUT"   : "TRUNCATE",
+  "TABLES"    :
+  [
+  {
+   "TABLENAME"    : "$0_D637F0D7",
+  },
+  {
+   "TABLENAME"    : "$1_B62FB41E",
+  },
+  {
+   "TABLENAME"    : "$2_7E5AED68",
+  },
+  {
+   "TABLENAME"    : "$3_5AB90DD5",
+  },
+  {
+   "TABLENAME"    : "$4_8F9F9891",
+  },
+  {
+   "TABLENAME"    : "$5_4014B10E",
+  },
+  {
+   "TABLENAME"    : "$6_27D8FE9",
+  }
+  ]
+ }
+]
+(name='tt', period='daily', retention=7, nshards=7, version=0, shard0name='<none>')
+(name='tt', shardname='$0_D637F0D7')
+(name='tt', shardname='$1_B62FB41E')
+(name='tt', shardname='$2_7E5AED68')
+(name='tt', shardname='$3_5AB90DD5')
+(name='tt', shardname='$4_8F9F9891')
+(name='tt', shardname='$5_4014B10E')
+(name='tt', shardname='$6_27D8FE9')
+(rows inserted=5)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=10)
+(rows inserted=5)
+
+[]
+
+(count(*)=70)
+(a=6)
+(a=7)
+(a=8)
+(a=9)
+(a=10)
+(a=16)
+(a=17)
+(a=18)
+(a=19)
+(a=20)
+(a=26)
+(a=27)
+(a=28)
+(a=29)
+(a=30)
+(a=31)
+(a=32)
+(a=33)
+(a=34)
+(a=35)
+(a=36)
+(a=37)
+(a=38)
+(a=39)
+(a=40)
+(a=46)
+(a=47)
+(a=48)
+(a=49)
+(a=50)
+(a=51)
+(a=52)
+(a=53)
+(a=54)
+(a=55)
+(a=56)
+(a=57)
+(a=58)
+(a=59)
+(a=60)
+(a=61)
+(a=62)
+(a=63)
+(a=64)
+(a=65)
+(a=66)
+(a=67)
+(a=68)
+(a=69)
+(a=70)
+(a=1021)
+(a=1022)
+(a=1023)
+(a=1024)
+(a=1025)
+(a=1041)
+(a=1042)
+(a=1043)
+(a=1044)
+(a=1045)
+(a=2001)
+(a=2002)
+(a=2003)
+(a=2004)
+(a=2005)
+(a=2006)
+(a=2007)
+(a=2008)
+(a=2009)
+(a=2010)
