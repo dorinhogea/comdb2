@@ -2582,6 +2582,10 @@ REGISTER_TUNABLE("partition_unique_debug",
                  "Enable debug tracing for partition_unique cross-shard unique enforcement (Default: off). "
                  "Logs packet build/send on replicant, receive/store and free on master, and each cross-shard check.",
                  TUNABLE_BOOLEAN, &gbl_partition_unique_debug, NOARG, NULL, NULL, NULL, NULL);
+REGISTER_TUNABLE("partition_unique_skip_locks",
+                 "Debug: when set, OSQL_PARTITION_SHARDS will not acquire read table locks for sibling shards "
+                 "(Default: off)",
+                 TUNABLE_BOOLEAN, &gbl_partition_unique_skip_locks, NOARG, NULL, NULL, NULL, NULL);
 REGISTER_TUNABLE("partition_sc_reorder", "If the schema change is serialized for a partition, run current shard last",
                  TUNABLE_BOOLEAN, &gbl_partition_sc_reorder, 0, NULL, NULL, NULL, NULL);
 REGISTER_TUNABLE("partition_retroactively",

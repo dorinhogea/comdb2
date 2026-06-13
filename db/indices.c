@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include "comdb2_atomic.h"
 #include "schemachange.h"
 #include "block_internal.h"
 #include "logmsg.h"
@@ -556,13 +557,24 @@ done:
  */
 int check_cross_shard_unique(struct ireq *iq, void *trans, int ixnum, char *key, int keylen, int *opfailcode)
 {
-    if (!gbl_partition_unique || !iq->partition_shards)
+    if (!gbl_partition_unique || !iq->partition_shards) {
+        if (gbl_partition_unique_debug && gbl_partition_unique && !iq->partition_shards)
+            logmsg(LOGMSG_USER, "check_cross_shard_unique: partition_shards is NULL for %s\n",
+                   iq->usedb ? iq->usedb->tablename : "NULL");
         return 0;
+    }
     if (iq->usedb->ix_dupes[ixnum] != 0)
         return 0;
     if (ix_isnullk(iq->usedb, key, ixnum))
         return 0;
 
+    if (gbl_partition_unique_debug) {
+        extern long long gbl_cross_shard_calls;
+        ATOMIC_ADD64(gbl_cross_shard_calls, 1);
+    }
+
+    extern __thread int64_t bdb_thr_lockreqs;
+    int64_t lr_start = gbl_partition_unique_debug ? bdb_thr_lockreqs : 0;
     int rc = 0;
     struct dbtable *saveddb = iq->usedb;
     if (gbl_partition_unique_debug)
@@ -586,6 +598,12 @@ int check_cross_shard_unique(struct ireq *iq, void *trans, int ixnum, char *key,
         }
     }
     iq->usedb = saveddb;
+    if (gbl_partition_unique_debug) {
+        extern long long gbl_lockreqs_in_pdt;
+        int64_t delta = bdb_thr_lockreqs - lr_start;
+        if (delta > 0)
+            ATOMIC_ADD64(gbl_lockreqs_in_pdt, delta);
+    }
     return rc;
 }
 

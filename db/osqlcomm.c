@@ -7793,21 +7793,23 @@ done_delete:
                 iq->npartition_shards = 0;
                 return ERR_INTERNAL;
             }
-            rc = bdb_lock_tablename_read(thedb->bdb_env, name, trans);
-            if (rc == BDBERR_DEADLOCK) {
-                if (iq->debug)
-                    reqprintf(iq, "LOCK PARTITION SHARD READ DEADLOCK");
-                free(iq->partition_shards);
-                iq->partition_shards = NULL;
-                iq->npartition_shards = 0;
-                return RC_INTERNAL_RETRY;
-            } else if (rc) {
-                if (iq->debug)
-                    reqprintf(iq, "LOCK PARTITION SHARD READ ERROR: %d", rc);
-                free(iq->partition_shards);
-                iq->partition_shards = NULL;
-                iq->npartition_shards = 0;
-                return ERR_INTERNAL;
+            if (!gbl_partition_unique_skip_locks) {
+                rc = bdb_lock_tablename_read(thedb->bdb_env, name, trans);
+                if (rc == BDBERR_DEADLOCK) {
+                    if (iq->debug)
+                        reqprintf(iq, "LOCK PARTITION SHARD READ DEADLOCK");
+                    free(iq->partition_shards);
+                    iq->partition_shards = NULL;
+                    iq->npartition_shards = 0;
+                    return RC_INTERNAL_RETRY;
+                } else if (rc) {
+                    if (iq->debug)
+                        reqprintf(iq, "LOCK PARTITION SHARD READ ERROR: %d", rc);
+                    free(iq->partition_shards);
+                    iq->partition_shards = NULL;
+                    iq->npartition_shards = 0;
+                    return ERR_INTERNAL;
+                }
             }
             iq->partition_shards[iq->npartition_shards] = get_dbtable_by_name(name);
             if (iq->partition_shards[iq->npartition_shards])
@@ -7815,8 +7817,8 @@ done_delete:
             name = nul + 1;
         }
         if (gbl_partition_unique_debug) {
-            logmsg(LOGMSG_USER, "%s: [master] received OSQL_PARTITION_SHARDS nshards=%d stored=%d\n", __func__, nshards,
-                   iq->npartition_shards);
+            logmsg(LOGMSG_USER, "%s: [master] received OSQL_PARTITION_SHARDS nshards=%d stored=%d\n", __func__,
+                   nshards, iq->npartition_shards);
             for (int i = 0; i < iq->npartition_shards; i++)
                 logmsg(LOGMSG_USER, "%s: [master]   shard[%d]='%s'\n", __func__, i, iq->partition_shards[i]->tablename);
         }

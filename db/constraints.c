@@ -23,6 +23,7 @@
 
 #include "cdb2_constants.h"
 #include "comdb2.h"
+#include "comdb2_atomic.h"
 #include <schemachange.h>
 #include "tag.h"
 #include "tohex.h"
@@ -243,11 +244,14 @@ static inline void free_cached_delayed_indexes(struct ireq *iq)
         free(iq->idxDelete);
         iq->idxInsert = iq->idxDelete = NULL;
     }
-    if (gbl_partition_unique_debug && iq->partition_shards)
-        logmsg(LOGMSG_USER, "%s: [master] freeing partition_shards nshards=%d\n", __func__, iq->npartition_shards);
-    free(iq->partition_shards);
-    iq->partition_shards = NULL;
-    iq->npartition_shards = 0;
+    /* partition_shards must survive the entire transaction */
+    if (gbl_partition_unique_debug && gbl_partition_unique) {
+        if (!iq->partition_shards) {
+            static __thread int free_nil_count = 0;
+            if (++free_nil_count <= 5)
+                logmsg(LOGMSG_USER, "free_cached_delayed_indexes: partition_shards already NULL! iq=%p\n", (void *)iq);
+        }
+    }
 }
 
 enum ct_etype { CTE_ADD = 1, CTE_DEL, CTE_UPD };
@@ -1176,6 +1180,10 @@ int upsert_collision_should_force_verify_error(int flags, int ixnum)
 int delayed_key_adds(struct ireq *iq, void *trans, int *blkpos, int *ixout,
                      int *errout)
 {
+    if (gbl_partition_unique_debug) {
+        extern long long gbl_dka_calls;
+        ATOMIC_ADD64(gbl_dka_calls, 1);
+    }
     int rc = 0, fndlen = 0, err = 0, limit = 0, dup_txn_insert = 0;
     int idx = 0, ixkeylen = -1;
     void *od_dta = NULL;
@@ -1414,6 +1422,13 @@ int delayed_key_adds(struct ireq *iq, void *trans, int *blkpos, int *ixout,
             prefault_kill_bits(iq, doidx, PFRQ_NEWKEY);
 
             /* cross-shard unique check for TRUNCATE partitions */
+            if (gbl_partition_unique_debug) {
+                static __thread int dka_count = 0;
+                if (++dka_count <= 3)
+                    logmsg(LOGMSG_USER, "delayed_key_adds: iq=%p partition_shards=%p nshards=%d skip_locks=%d\n",
+                           (void *)iq, (void *)iq->partition_shards, iq->npartition_shards,
+                           gbl_partition_unique_skip_locks);
+            }
             rc = check_cross_shard_unique(iq, trans, doidx, key, ixkeylen, errout);
             if (rc == RC_INTERNAL_RETRY) {
                 *blkpos = curop->blkpos;

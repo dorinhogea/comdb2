@@ -8927,6 +8927,16 @@ int sqlite3BtreeInsert(
     struct sql_thread *thd = pCur->thd;
     struct sqlclntstate *clnt = pCur->clnt;
 
+    if (gbl_partition_unique_debug && pCur->db && pCur->db->timepartition_name) {
+        static int btinsert_logged = 0;
+        if (!btinsert_logged) {
+            logmsg(LOGMSG_USER, "sqlite3BtreeInsert: tbl=%s timepartition=%s is_remote=%d mode=%d\n",
+                   pCur->db->tablename, pCur->db->timepartition_name, pCur->bt ? pCur->bt->is_remote : -1,
+                   clnt ? clnt->dbtran.mode : -1);
+            btinsert_logged = 1;
+        }
+    }
+
     pKey = pPayload->pKey;
     nKey = pPayload->nKey;
     pData = pPayload->pData;
