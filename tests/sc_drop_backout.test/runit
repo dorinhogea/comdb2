@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+# A DROP TABLE that is backed out after it finalized must leave the table, and
+# the foreign keys between it and other tables, exactly as before the drop.
+
+bash -n "$0" || exit 1
+dbnm=$1
+
+master=`cdb2sql --tabs ${CDB2_OPTIONS} $dbnm default 'select host from comdb2_cluster where is_master="Y"'`
+
+function sql
+{
+    cdb2sql --tabs ${CDB2_OPTIONS} --host $master $dbnm "$1" 2>&1
+}
+
+function failexit
+{
+    echo "FAILED: $1"
+    exit 1
+}
+
+# must succeed
+function ok
+{
+    local out
+    out=$(sql "$1") || failexit "'$1' failed: $out"
+}
+
+# must fail
+function ko
+{
+    local out
+    out=$(sql "$1") && failexit "'$1' should have failed: $out"
+    echo "'$1' failed as expected: $out"
+}
+
+ok "create table p(a int primary key)"
+ok "create table t(a int index, b int, foreign key (a) references p(a))"
+ok "insert into p values (1), (2)"
+ok "insert into t values (1, 10)"
+
+# the blkseq insert fails after the drop finalized, so the drop is backed out
+ok "exec procedure sys.cmd.send('test_ddl_backout_blkseq 1')"
+ko "drop table t"
+ok "exec procedure sys.cmd.send('test_ddl_backout_blkseq 0')"
+
+# the table is back, with its data
+out=$(sql "select a, b from t") || failexit "select from t failed: $out"
+[[ "$out" == "1	10" ]] || failexit "t has '$out' instead of '1	10'"
+out=$(sql "select count(*) from comdb2_tables where tablename = 't'")
+[[ "$out" == "1" ]] || failexit "t is not in comdb2_tables: $out"
+ok "insert into t values (2, 20)"
+
+# t's foreign key is still checked on t
+ko "insert into t values (3, 30)"
+
+# and on p: a parent row t refers to cannot go
+ko "delete from p where a = 1"
+ko "update p set a = 5 where a = 2"
+out=$(sql "select a from p order by a" | xargs)
+[[ "$out" == "1 2" ]] || failexit "p has '$out' instead of '1 2'"
+
+# a drop that commits still works
+ok "drop table t"
+ko "select * from t"
+ok "delete from p where a = 1"
+
+# A transaction whose first drop finalizes and whose second drop then fails
+# in finalize: inside a transaction, the check that the table is not
+# referenced by a foreign key is left to finalize.
+ok "create table x(a int)"
+ok "insert into x values (7)"
+ok "create table p2(a int primary key)"
+ok "create table t2(a int index, foreign key (a) references p2(a))"
+ok "insert into p2 values (1)"
+ok "insert into t2 values (1)"
+
+out=$(printf "begin\ndrop table x\ndrop table p2\ncommit\n" |
+      cdb2sql --tabs ${CDB2_OPTIONS} --host $master $dbnm - 2>&1)
+echo "$out"
+echo "$out" | grep -q "referenced by a foreign key" || failexit "commit did not fail in finalize: $out"
+
+# x, dropped before the failing drop, is back with its data
+out=$(sql "select a from x") || failexit "select from x failed: $out"
+[[ "$out" == "7" ]] || failexit "x has '$out' instead of '7'"
+out=$(sql "select count(*) from comdb2_tables where tablename = 'x'")
+[[ "$out" == "1" ]] || failexit "x is not in comdb2_tables: $out"
+ok "insert into x values (8)"
+
+# p2 and its foreign key are unchanged
+ko "delete from p2 where a = 1"
+ko "insert into t2 values (2)"
+
+echo "Success"
